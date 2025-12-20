@@ -1,56 +1,62 @@
-import { Link } from "expo-router";
+import { LabeledInput } from "@/components";
+import { auth } from "@/firebaseConfig";
+import { Link, useRouter } from "expo-router";
+import { signInWithEmailAndPassword } from "firebase/auth";
 import { useState } from "react";
-import { Alert, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, Text, TouchableOpacity, View } from "react-native";
 
 export default function Login() {
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
+  const [loading, setLoading] = useState<boolean>(false);
 
-  const handleRegister = () => {
+  const router = useRouter();
+
+  const handleRegister = async () => {
     if (!email || !password) {
-      Alert.alert("Błąd", "Wszystkie pola muszą być wypełnione");
+      Alert.alert("Błąd logowania", "Wszystkie pola muszą być wypełnione.");
       return;
     }
 
-    console.log("Logowanie użytkownika:", {
-      email,
-      password,
-    });
+    try {
+      setLoading(true);
+      await signInWithEmailAndPassword(auth, email, password);
+      router.push("/(tabs)");
+    } catch (err: any) {
+      if (err.code === "auth/invalid-credential") {
+        Alert.alert("Błąd logowania", "Konto o takich danych nie istnieje.");
+        return;
+      }
+      Alert.alert("Nieznany błąd", err.code);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <View className="bg-white w-screen h-screen flex items-center justify-center px-8">
-      <Text className="text-2xl font-black mb-6">Logowanie</Text>
+      <Text className="text-2xl font-black mb-8">Logowanie</Text>
       <View className="w-full flex flex-col gap-3">
-        <View>
-          <Text className="mb-2 font-semibold">Email</Text>
-          <TextInput
-            placeholder="np. jankowalski@gmail.com"
-            placeholderTextColor="#666"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            className="bg-black/10 text-black rounded-md p-3"
-          />
-        </View>
-        <View>
-          <Text className="mb-2 font-semibold">Hasło</Text>
-          <TextInput
-            placeholder="********"
-            placeholderTextColor="#666"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            className="bg-black/10 text-black rounded-md p-3"
-          />
-        </View>
+        <LabeledInput
+          label="Email"
+          placeholder="jankowalski@gmail.com"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+        />
+        <LabeledInput
+          label="Hasło"
+          placeholder="********"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+        />
         <TouchableOpacity
-          className="bg-blue-500 py-4 rounded-md mt-4"
+          className="bg-green-500 py-4 mt-4"
           onPress={handleRegister}
         >
           <Text className="text-white text-center font-semibold">
-            Zaloguj się
+            {loading ? "Logowanie..." : "Zaloguj się"}
           </Text>
         </TouchableOpacity>
         <Link href="/(auth)/register" asChild>

@@ -9,12 +9,14 @@ export default function Welcome() {
       {/* Image */}
       <View className="w-full h-[700px] bg-black relative">
         <Image
-          source={images.start}
+          source={images.start2}
           alt="runner image"
           className="absolute w-full h-full object-cover"
         />
-        <View className="size-full bg-black/50 absolute p-10 pt-20">
-          <Text className="text-6xl text-white font-black">Smart{"\n"}Run</Text>
+        <View className="size-full bg-black/70 absolute p-10 pt-20">
+          <Text className="text-4xl text-white font-black text-center">
+            Run4Life
+          </Text>
         </View>
       </View>
       {/* Buttons */}
