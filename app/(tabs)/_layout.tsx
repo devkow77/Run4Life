@@ -6,16 +6,16 @@ import { Image, Text, View } from "react-native";
 const TabIcon = ({ focused, icon, title }: any) => {
   if (focused) {
     return (
-      <View className="bg-white flex flex-row w-full flex-1 min-w-[130px] min-h-[52px] mt-4 justify-center gap-2 items-center overflow-hidden">
-        <Image source={icon} tintColor="#000" className="size-5" />
-        <Text className="text-black text-base font-semibold">{title}</Text>
+      <View className="bg-[#16a34a] flex flex-row w-full flex-1 min-w-[106px] min-h-[52px] mt-4 justify-center gap-2 items-center overflow-hidden">
+        <Image source={icon} tintColor="#fff" className="size-5" />
+        <Text className="text-white text-base font-semibold">{title}</Text>
       </View>
     );
   }
 
   return (
     <View className="size-full justify-center items-center mt-4 ">
-      <Image source={icon} tintColor="#FFF" className="size-5" />
+      <Image source={icon} tintColor="#fff" className="size-5" />
     </View>
   );
 };
@@ -32,12 +32,13 @@ const _layout = () => {
           alignItems: "center",
         },
         tabBarStyle: {
-          backgroundColor: "#000",
+          backgroundColor: "#171717",
           marginHorizontal: 20,
           marginBottom: 36,
           height: 50,
           position: "absolute",
           overflow: "hidden",
+          width: 318,
         },
       }}
     >
@@ -67,7 +68,7 @@ const _layout = () => {
           title: "Profile",
           headerShown: false,
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} title="Konto" icon={icons.home} />
+            <TabIcon focused={focused} title="Konto" icon={icons.profile} />
           ),
         }}
       />

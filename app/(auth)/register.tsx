@@ -99,7 +99,7 @@ const Register = () => {
           onChangeText={setConfirmPassword}
           secureTextEntry
         />
-        <TouchableOpacity className="bg-black py-4 mt-4" onPress={signUp}>
+        <TouchableOpacity className="bg-[#171717] py-4 mt-4" onPress={signUp}>
           <Text className="text-white text-center font-semibold">
             {loading ? "Rejestrowanie konta..." : "Zarejestruj się"}
           </Text>

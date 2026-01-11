@@ -6,8 +6,8 @@ import { useState } from "react";
 import { Alert, Text, TouchableOpacity, View } from "react-native";
 
 export default function Login() {
-  const [email, setEmail] = useState<string>("");
-  const [password, setPassword] = useState<string>("");
+  const [email, setEmail] = useState<string>("kacper@gmail.com");
+  const [password, setPassword] = useState<string>("Haslo12345.");
   const [loading, setLoading] = useState<boolean>(false);
 
   const router = useRouter();
