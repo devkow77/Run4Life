@@ -7,13 +7,13 @@ export default function Welcome() {
   return (
     <View className="w-screen h-screen">
       {/* Image */}
-      <View className="w-full h-[700px] bg-black relative">
+      <View className="w-full h-[600px] bg-black relative">
         <Image
           source={images.start2}
           alt="runner image"
           className="absolute w-full h-full object-cover"
         />
-        <View className="size-full bg-black/70 absolute p-10 pt-20">
+        <View className="size-full bg-black/90 absolute p-10 pt-20">
           <Text className="text-4xl text-white font-black text-center">
             Run4Life
           </Text>
@@ -22,7 +22,7 @@ export default function Welcome() {
       {/* Buttons */}
       <View className="px-8 flex flex-col gap-2 justify-center flex-1">
         <Link href="/(auth)/register" asChild>
-          <TouchableOpacity className="bg-black w-full py-4 flex flex-row items-center justify-between px-8">
+          <TouchableOpacity className="bg-black w-full py-4 flex flex-row gap-x-2 items-center justify-center px-8">
             <Text className="text-white text-lg font-semibold">
               ROZPOCZNIJ SWOJĄ PRZYGODĘ
             </Text>

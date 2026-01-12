@@ -1,7 +1,7 @@
 import { LabeledInput } from "@/components";
 import { images } from "@/constants/images";
 import { auth, db } from "@/firebaseConfig";
-import { useRouter } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import { signOut, updatePassword } from "firebase/auth";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
@@ -48,19 +48,19 @@ const Profile = () => {
     if (!user) return;
 
     if (password.length < 6) {
-      Alert.alert("Błąd", "Hasło musi mieć co najmniej 6 znaków");
+      Alert.alert("Błąd", "Hasło musi mieć co najmniej 6 znaków.");
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert("Błąd", "Hasła nie są takie same");
+      Alert.alert("Błąd", "Hasła nie są takie same.");
       return;
     }
 
     try {
       await updatePassword(user, password);
 
-      Alert.alert("Sukces", "Hasło zostało zmienione");
+      Alert.alert("Sukces", "Hasło zostało zmienione.");
       setPassword("");
       setConfirmPassword("");
     } catch (err: any) {
@@ -68,10 +68,10 @@ const Profile = () => {
       if (err.code === "auth/requires-recent-login") {
         Alert.alert(
           "Wymagane ponowne logowanie",
-          "Zaloguj się ponownie, aby zmienić hasło"
+          "Zaloguj się ponownie, aby zmienić hasło."
         );
       } else {
-        Alert.alert("Błąd", "Nie udało się zmienić hasła");
+        Alert.alert("Błąd", "Nie udało się zmienić hasła.");
       }
       console.log(err);
     }
@@ -187,7 +187,22 @@ const Profile = () => {
     fetchUserStats();
   }, [user]);
 
-  if (!user) return;
+  // Jeżeli użytkownik nie jest zalogowany
+  if (!user)
+    return (
+      <View className="flex-1 pt-24 bg-white px-6">
+        <Text className="text-xl font-black text-center mb-4">
+          Zostałeś wylogowany
+        </Text>
+        <Link href="/(auth)/login" asChild>
+          <TouchableOpacity className="w-full py-4 bg-green-600">
+            <Text className="text-white text-center text-lg font-bold">
+              Zaloguj się
+            </Text>
+          </TouchableOpacity>
+        </Link>
+      </View>
+    );
 
   return (
     <View className="flex-1 pt-24 bg-white px-6">

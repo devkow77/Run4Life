@@ -16,6 +16,8 @@ import "../global.css";
 export default function Index() {
   const [lastRuns, setLastRuns] = useState<any[]>([]);
 
+  const user = auth.currentUser;
+
   // Funkcja do pobrania 3 ostatnich biegów
   const fetchLastRuns = async () => {
     const user = auth.currentUser;
@@ -44,6 +46,23 @@ export default function Index() {
   useEffect(() => {
     fetchLastRuns();
   }, []);
+
+  // Jeżeli użytkownik nie jest zalogowany
+  if (!user)
+    return (
+      <View className="flex-1 pt-24 bg-white px-6">
+        <Text className="text-xl font-black text-center mb-4">
+          Zostałeś wylogowany
+        </Text>
+        <Link href="/(auth)/login" asChild>
+          <TouchableOpacity className="w-full py-4 bg-green-600">
+            <Text className="text-white text-center text-lg font-bold">
+              Zaloguj się
+            </Text>
+          </TouchableOpacity>
+        </Link>
+      </View>
+    );
 
   return (
     <View className="flex-1 pt-10 bg-white px-6">

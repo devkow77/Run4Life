@@ -1,15 +1,17 @@
-import { auth, db } from "@/firebaseConfig"; // popraw ścieżkę do swojego firebase.ts
+import { auth, db } from "@/firebaseConfig";
 import * as Location from "expo-location";
-import * as Torch from "expo-torch";
+import { Pedometer } from "expo-sensors";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { useEffect, useRef, useState } from "react";
-import { Alert, Text, TouchableOpacity, View } from "react-native";
+import { Text, TouchableOpacity, Vibration, View } from "react-native";
 import MapView, { Polyline } from "react-native-maps";
 
-// pomocnicza funkcja do obliczania dystansu (Haversine)
+// Konwersja stopni na radiany (używane w Haversine)
 const toRad = (v: number) => (v * Math.PI) / 180;
+
+// Obliczanie dystansu między dwoma punktami GPS w kilometrach (Haversine)
 const haversine = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-  const R = 6371; // km
+  const R = 6371; // promień Ziemi w km
   const dLat = toRad(lat2 - lat1);
   const dLon = toRad(lon2 - lon1);
   const a =
@@ -19,66 +21,82 @@ const haversine = (lat1: number, lon1: number, lat2: number, lon2: number) => {
 };
 
 export default function RunMap() {
-  const mapRef = useRef<MapView | null>(null);
-  const locationSub = useRef<Location.LocationSubscription | null>(null);
-  const timerRef = useRef<number | null>(null);
-  const [isTracking, setIsTracking] = useState(false);
+  const mapRef = useRef<MapView | null>(null); // referencja do MapView, żeby np. centrować kamerę
+  const locationSub = useRef<Location.LocationSubscription | null>(null); // referencja do subskrypcji GPS
+  const timerRef = useRef<number | null>(null); // referencja do timera sekund
+  const kmReached = useRef(0); // śledzi ostatni pełny km, żeby wibrować co 1 km
+
+  const [isTracking, setIsTracking] = useState(false); // czy bieg jest aktywny
   const [route, setRoute] = useState<{ latitude: number; longitude: number }[]>(
     []
-  );
-  const [distance, setDistance] = useState(0);
-  const [seconds, setSeconds] = useState(0);
-  const [paused, setPaused] = useState(false);
+  ); // zapis trasy
+  const [distance, setDistance] = useState(0); // dystans w km
+  const [seconds, setSeconds] = useState(0); // czas w sekundach
+  const [paused, setPaused] = useState(false); // czy bieg jest wstrzymany
   const [startAddress, setStartAddress] = useState<{
     city: string;
     street: string;
-  }>({ city: "", street: "" });
+  }>({ city: "", street: "" }); // początkowy adres
   const [endAddress, setEndAddress] = useState<{
     city: string;
     street: string;
-  }>({ city: "", street: "" });
-  const [torchOn, setTorchOn] = useState(false);
+  }>({ city: "", street: "" }); // końcowy adres
+  const [torchOn, setTorchOn] = useState(false); // stan latarki
+  const [loadingLocation, setLoadingLocation] = useState(false); // stan ladowania lokalizacji gps przy starcie
+  const [steps, setSteps] = useState(0); // liczenie kroków
+  const pedometerSub = useRef<any>(null); // referencja do liczenia kroków
 
   useEffect(() => {
     return () => {
+      // usuń subskrypcję GPS i timer po zamknięciu komponentu
       locationSub.current?.remove();
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, []);
 
+  // START ŚLEDZENIA BIEGU
   const startTracking = async () => {
+    // poproś o uprawnienia
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== "granted") return;
 
-    // Pobranie lokalizacji poczatkowej
-    const location = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.High,
-    });
-    const addr = await getAddress(
-      location.coords.latitude,
-      location.coords.longitude
-    );
-    setStartAddress(addr);
+    setLoadingLocation(true); // pokaż overlay ładowania GPS
 
-    setRoute([]);
-    setDistance(0);
+    // uruchom timer od razu
     setSeconds(0);
+    setDistance(0);
+    setRoute([]);
     setIsTracking(true);
     setPaused(false);
 
+    // uruchom liczenie kroków
+    pedometerSub.current?.remove(); // usuń stare subskrypcje
+    setSteps(0);
+
+    pedometerSub.current = Pedometer.watchStepCount((result) => {
+      setSteps(result.steps);
+    });
+
+    locationSub.current?.remove();
+    if (timerRef.current) clearInterval(timerRef.current);
+
     timerRef.current = setInterval(() => setSeconds((s) => s + 1), 1000);
 
+    // od razu startujemy watchPositionAsync, bez czekania na getCurrentPositionAsync
     locationSub.current = await Location.watchPositionAsync(
       {
-        accuracy: Location.Accuracy.High,
+        accuracy: Location.Accuracy.Balanced,
         timeInterval: 1000,
         distanceInterval: 5,
       },
-      (location) => {
+      async (location) => {
         const { latitude, longitude, accuracy } = location.coords;
-        if (accuracy && accuracy > 20) return;
+        if (accuracy && accuracy > 50) return; // ignoruj bardzo niedokładne
 
         setRoute((prev) => {
+          const next = [...prev, { latitude, longitude }];
+
+          // liczenie dystansu tylko raz
           if (prev.length > 0) {
             const last = prev[prev.length - 1];
             const d = haversine(
@@ -87,21 +105,42 @@ export default function RunMap() {
               latitude,
               longitude
             );
-            setDistance((dist) => dist + d);
+
+            setDistance((dist) => {
+              const newDist = dist + d;
+
+              // wibracja co 1 km
+              if (Math.floor(newDist) > kmReached.current) {
+                kmReached.current = Math.floor(newDist);
+                Vibration.vibrate([0, 500, 200, 500]);
+              }
+
+              return newDist;
+            });
           }
-          const next = [...prev, { latitude, longitude }];
-          if (next.length === 1) {
+
+          // pierwszy punkt – ustaw kamerę i pobierz adres
+          if (prev.length === 0) {
+            (async () => {
+              const addr = await getAddress(latitude, longitude);
+              setStartAddress(addr);
+            })();
+
             mapRef.current?.animateCamera({
               center: { latitude, longitude },
               zoom: 17,
             });
+
+            setLoadingLocation(false);
           }
+
           return next;
         });
       }
     );
   };
 
+  // ZATRZYMANIE BIEGU
   const stopTracking = () => {
     // zatrzymaj GPS
     locationSub.current?.remove();
@@ -114,9 +153,12 @@ export default function RunMap() {
     }
 
     setIsTracking(false);
-    setPaused(true); // włącz overlay z opcją zapisu lub kontynuacji
+    setPaused(true); // pokaż overlay z opcją zapisu lub kontynuacji
+    pedometerSub.current?.remove();
+    pedometerSub.current = null;
   };
 
+  // KONTYNUACJA BIEGU PO PAUZIE
   const continueTracking = async () => {
     // usuń stary watch, jeśli istnieje
     if (locationSub.current) {
@@ -147,13 +189,14 @@ export default function RunMap() {
         if (accuracy && accuracy > 20) return;
 
         setRoute((prev) => {
+          // pierwszy punkt po wznowieniu - nie dodajemy dystansu
           if (prev.length === 0 || firstPoint) {
-            // pierwszy punkt po wznowieniu - nie dodajemy dystansu
             firstPoint = false;
             return [...prev, { latitude, longitude }];
           }
 
           const last = prev[prev.length - 1];
+
           // dodaj dystans tylko jeśli punkt się zmienił
           if (last.latitude !== latitude || last.longitude !== longitude) {
             const d = haversine(
@@ -162,7 +205,19 @@ export default function RunMap() {
               latitude,
               longitude
             );
-            setDistance((dist) => dist + d);
+
+            setDistance((dist) => {
+              const newDist = dist + d;
+
+              // wibracja co 1 km
+              if (Math.floor(newDist) > kmReached.current) {
+                kmReached.current = Math.floor(newDist);
+                Vibration.vibrate([0, 500, 200, 500]);
+              }
+
+              return newDist;
+            });
+
             return [...prev, { latitude, longitude }];
           }
 
@@ -172,13 +227,14 @@ export default function RunMap() {
     );
   };
 
+  // ZAPIS BIEGU DO FIRESTORE
   const saveRun = async () => {
-    if (route.length < 2) return;
+    kmReached.current = 0; // reset km po zapisie
 
     const user = auth.currentUser;
     if (!user) return;
 
-    // Zapis koncowej miejscowosci biegu
+    // pobierz końcowy adres
     const lastPoint = route[route.length - 1];
     const endAddr = await getAddress(lastPoint.latitude, lastPoint.longitude);
     setEndAddress(endAddr);
@@ -195,7 +251,7 @@ export default function RunMap() {
         createdAt: serverTimestamp(),
       });
 
-      // reset po zapisie
+      // reset stanów po zapisie
       setRoute([]);
       setDistance(0);
       setSeconds(0);
@@ -205,9 +261,7 @@ export default function RunMap() {
     }
   };
 
-  const pace = distance > 0 ? seconds / 60 / distance : 0;
-
-  // Funkcja do pobrania adresu na podstawie wspolrzednych
+  // POBRANIE ADRESU NA PODSTAWIE WSPÓŁRZĘDNYCH
   const getAddress = async (latitude: number, longitude: number) => {
     try {
       const [address] = await Location.reverseGeocodeAsync({
@@ -225,18 +279,10 @@ export default function RunMap() {
     }
   };
 
-  // Funkcja przelączająca latarke
+  // PRZEŁĄCZANIE LATARKI
   const toggleTorch = async () => {
-    if (!Torch || !Torch.setStateAsync) {
-      Alert.alert(
-        "Latarka niedostępna",
-        "Funkcja latarki działa tylko w dev build lub standalone APK"
-      );
-      return;
-    }
-
     try {
-      await Torch.setStateAsync(torchOn ? "off" : "on");
+      // await ExpoTorch.setStateAsync(torchOn ? ExpoTorch.OFF : ExpoTorch.ON);
       setTorchOn((prev) => !prev);
     } catch (err) {
       console.log("Błąd przy sterowaniu latarką:", err);
@@ -245,8 +291,15 @@ export default function RunMap() {
 
   return (
     <View className="flex-1 gap-4">
-      {/* Map */}
+      {/* MAPA */}
       <View className="relative w-full h-[400px]">
+        {loadingLocation && (
+          <View className="absolute inset-0 z-50 bg-black/80 items-center justify-center">
+            <Text className="text-white font-bold text-lg">
+              🌍 Ładowanie GPS...
+            </Text>
+          </View>
+        )}
         <MapView
           ref={mapRef}
           style={{ flex: 1 }}
@@ -259,6 +312,7 @@ export default function RunMap() {
             longitudeDelta: 0.01,
           }}
         >
+          {/* Linia trasy */}
           {route.length > 1 && (
             <Polyline
               coordinates={route}
@@ -267,12 +321,13 @@ export default function RunMap() {
             />
           )}
         </MapView>
-        {/* Overlay po zatrzymaniu*/}
+
+        {/* Overlay po zatrzymaniu */}
         {paused && (
           <View className="absolute bottom-4 w-full flex-row gap-2 items-center justify-center">
             <TouchableOpacity
               onPress={saveRun}
-              className="bg-green-600  p-3 border border-neutral-300"
+              className="bg-green-600 p-3 border border-neutral-300"
             >
               <Text className="text-white font-semibold">Zapisz trase</Text>
             </TouchableOpacity>
@@ -284,6 +339,7 @@ export default function RunMap() {
             </TouchableOpacity>
           </View>
         )}
+
         {/* Przycisk latarki */}
         <TouchableOpacity
           onPress={toggleTorch}
@@ -292,7 +348,8 @@ export default function RunMap() {
           <Text className="font-bold text-black">{torchOn ? "💡" : "🔦"}</Text>
         </TouchableOpacity>
       </View>
-      {/* Dolny HUD */}
+
+      {/* HUD na dole */}
       <View className="relative flex flex-row items-center w-full bg-neutral-900 h-[80px]">
         <View className="w-1/3 h-full">
           {!isTracking ? (
@@ -322,8 +379,10 @@ export default function RunMap() {
             {String(seconds % 60).padStart(2, "0")}
           </Text>
           <Text className="text-white">
-            Średnia prędkość: {pace ? pace.toFixed(2) : "0"} min/km
+            Średnia prędkość:{" "}
+            {distance > 0 ? (seconds / 60 / distance).toFixed(2) : "0"}: min/km
           </Text>
+          <Text className="text-white">Liczba kroków: {steps}</Text>
         </View>
       </View>
     </View>

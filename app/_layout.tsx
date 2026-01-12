@@ -10,7 +10,7 @@ export default function RootLayout() {
   useEffect(() => {
     onAuthStateChanged(auth, (user) => {
       if (!user) {
-        router.replace("/(auth)/login");
+        router.replace("/");
       } else {
         router.replace("/(tabs)");
       }

@@ -7,6 +7,7 @@ import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 const History = () => {
   const [allRuns, setAllRuns] = useState<any[]>([]);
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
+  const user = auth.currentUser;
 
   // Funkcja do pobrania wszystkich biegów
   const fetchAllRuns = async () => {
@@ -34,6 +35,23 @@ const History = () => {
   useEffect(() => {
     fetchAllRuns();
   }, [sortOrder]);
+
+  // Jeżeli użytkownik nie jest zalogowany
+  if (!user)
+    return (
+      <View className="flex-1 pt-24 bg-white px-6">
+        <Text className="text-xl font-black text-center mb-4">
+          Zostałeś wylogowany
+        </Text>
+        <Link href="/(auth)/login" asChild>
+          <TouchableOpacity className="w-full py-4 bg-green-600">
+            <Text className="text-white text-center text-lg font-bold">
+              Zaloguj się
+            </Text>
+          </TouchableOpacity>
+        </Link>
+      </View>
+    );
 
   return (
     <View className="flex-1 pt-24 bg-white px-6">
