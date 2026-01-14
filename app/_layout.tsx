@@ -1,24 +1,32 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
-
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+import { auth } from "@/firebaseConfig";
+import { Stack, useRouter } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import { onAuthStateChanged } from "firebase/auth";
+import { useEffect } from "react";
+import "react-native-reanimated";
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  const router = useRouter();
+
+  useEffect(() => {
+    onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        router.replace("/");
+      } else {
+        router.replace("/(tabs)");
+      }
+    });
+  }, []);
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+    <>
+      <StatusBar hidden />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="run/[id]" />
       </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    </>
   );
 }

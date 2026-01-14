@@ -1,98 +1,86 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import {
+  Container,
+  GoogleMap,
+  RunCard,
+  UnauthenticatedView,
+} from "@/components/index";
+import { RunFirestoreData, RunProps } from "@/constants/types";
+import { auth, db } from "@/firebaseConfig";
+import {
+  collection,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  where,
+} from "firebase/firestore";
+import { useEffect, useState } from "react";
+import { ScrollView, Text, View } from "react-native";
+import "../global.css";
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+export default function Index() {
+  const [lastRuns, setLastRuns] = useState<RunProps[]>([]);
 
-export default function HomeScreen() {
+  const user = auth.currentUser;
+
+  // Funkcja do pobrania 3 ostatnich biegów
+  const fetchLastRuns = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    try {
+      const runsRef = collection(db, "runs");
+      const q = query(
+        runsRef,
+        where("userId", "==", user.uid),
+        orderBy("createdAt", "desc"),
+        limit(3)
+      );
+      const lastRuns = await getDocs(q);
+      const tempLastRuns: RunProps[] = [];
+      lastRuns.forEach((doc) => {
+        const data = doc.data() as RunFirestoreData;
+        tempLastRuns.push({ id: doc.id, ...data });
+      });
+      setLastRuns(tempLastRuns);
+    } catch (err) {
+      console.log("Błąd przy pobieraniu 3 ostatnich biegów: ", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchLastRuns();
+  }, []);
+
+  // Jeżeli użytkownik nie jest zalogowany
+  if (!user) return <UnauthenticatedView />;
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
-
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    <Container className="pt-16">
+      <Text className="font-black text-lg text-center text-black mb-6">
+        Run4Life
+      </Text>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          gap: 32,
+        }}
+      >
+        <GoogleMap />
+        <View>
+          <Text className="font-black text-center mb-4">Ostatnie 3 trasy</Text>
+          <View className="gap-y-4">
+            {lastRuns.length ? (
+              lastRuns.map((run) => <RunCard key={run.id} {...run} />)
+            ) : (
+              <Text className="text-center">
+                Aktualnie nie masz zapisanych tras
+              </Text>
+            )}
+          </View>
+        </View>
+      </ScrollView>
+      <View className="w-full h-[100px] bg-white"></View>
+    </Container>
   );
 }
-
-const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
-});
